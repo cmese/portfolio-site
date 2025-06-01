@@ -1,9 +1,14 @@
+"use client";
+
 import Section from "@/components/Section";
+import Timeline from "@/components/Timeline";
+import { timelineRows } from "@/data/timeline";
+
 export default function Experience() {
   return (
-    <Section id="experience" className="text-center gap-6">
-      <h1 className="text-5xl md:text-7xl font-bold">Experience</h1>
-      <p className="text-xl md:text-2xl">Dynamic resume</p>
+    <Section id="experience" className="py-20">
+      <h2 className="mb-10 text-center text-3xl font-bold">Experience</h2>
+      <Timeline rows={timelineRows} />
     </Section>
   );
 }
