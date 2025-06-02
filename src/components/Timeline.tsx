@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useRef, useState, useLayoutEffect } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { timelineRows, BranchId, TimelineRow } from "@/data/timeline";
 import { branchOrder, branchColor } from "@/data/branchPalette";
@@ -21,13 +22,88 @@ const rowY = (idx: number) => idx * ROW_H + ROW_H / 2;
 /* special y-centre with offset logic */
 function nodeY(rowIdx: number, branch: BranchId, row: TimelineRow) {
   const base = rowY(rowIdx);
-  if (row.split === branch) return base + OFFSET; // first child node ↓
-  if (row.merge === branch) return base - OFFSET; // last  child node ↑
+  if (row.split === branch) return base + OFFSET; // first child node
+  if (row.merge === branch) return base - OFFSET; // last  child node
   return base; // regular node
 }
 
+function useTriangleTracker(stickyLinePx: number) {
+  const nodeMap = useRef<Record<string, { x: number; getY: () => number }>>({});
+  const [centerId, setCenterId] = useState<string | null>(null);
+  const [x, setX] = useState(0);
+
+  useLayoutEffect(() => {
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+
+        /* pick node whose centre-Y is closest to stickyLinePx */
+        let bestId: string | null = null;
+        let bestDist = Infinity;
+        Object.entries(nodeMap.current).forEach(([id, n]) => {
+          const dist = Math.abs(n.getY() - stickyLinePx);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestId = id;
+          }
+        });
+
+        if (bestId && bestId !== centerId) {
+          setCenterId(bestId);
+          setX(nodeMap.current[bestId].x);
+        }
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll(); // recalc immediately
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [centerId, stickyLinePx]);
+
+  /** node registration */
+  const register = (id: string, el: HTMLDivElement | null) => {
+    if (!el) return;
+    const rect = () => el.getBoundingClientRect();
+    nodeMap.current[id] = {
+      x: rect().left + rect().width / 2,
+      getY: () => rect().top + rect().height / 2,
+    };
+  };
+
+  return { x, centerId, register };
+}
+
+/* props */
+interface TimelineProps {
+  rows: typeof timelineRows;
+  headerRef: React.RefObject<HTMLElement>;
+}
+
 /* ═════════════════════ component ═════════════════════ */
-export default function Timeline() {
+export default function Timeline({ rows, headerRef }: TimelineProps) {
+  /* get the stickline (bottom edge of header) */
+  const [stickyY, setStickyY] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!headerRef.current) return;
+      setStickyY(headerRef.current.getBoundingClientRect().bottom);
+    };
+
+    measure(); // run once
+    window.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+
+    return () => {
+      window.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [headerRef]);
+
   /* 1. build vertical segments for every child branch */
   type Segment = { branch: BranchId; top: number; height: number };
   const segments: Segment[] = [];
@@ -49,6 +125,10 @@ export default function Timeline() {
     }
   });
 
+  //triangle tracker setup – stickyLine = header height + 10 px
+  const HEADER_H = 56; // <h2> ≈ 48 px + margin → tweak
+  const { x: triX, centerId, register } = useTriangleTracker(stickyY);
+
   /* grid container */
   return (
     <div
@@ -59,6 +139,23 @@ export default function Timeline() {
         gridTemplateRows: `repeat(${timelineRows.length}, ${ROW_H}px)`,
       }}
     >
+      {/* triangle – fixed Y just under sticky header */}
+      <div
+        className="pointer-events-none"
+        style={{
+          position: "fixed",
+          top: stickyY, // always sits on the sticky line
+          left: 0,
+          transform: `translateX(${triX - 12}px)`,
+          transition: "transform 400ms cubic-bezier(.25,1,.5,1)", // smooth ease
+          width: 24,
+          height: 24,
+          clipPath: "polygon(50% 0,100% 100%,0 100%)",
+          background: "#facc15",
+          zIndex: 30,
+        }}
+      />
+
       {/* main square + vertical */}
       <div
         style={{
@@ -230,9 +327,10 @@ export default function Timeline() {
 
         const nodes = nodeList.map(({ branch, id }) => (
           <Tooltip.Provider key={id} delayDuration={60}>
-            <Tooltip.Root>
+            <Tooltip.Root open={centerId === id}>
               <Tooltip.Trigger asChild>
                 <div
+                  ref={(el) => register(id, el)}
                   style={{
                     position: "absolute",
                     left: colX(branch) - NODE_R,
@@ -248,6 +346,7 @@ export default function Timeline() {
               <Tooltip.Portal>
                 <Tooltip.Content
                   side="right"
+                  collisionPadding={8}
                   className="select-none rounded-md bg-gray-900 px-2 py-1 text-sm text-white shadow"
                 >
                   {row.message}
