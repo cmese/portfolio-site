@@ -17,6 +17,16 @@ export default function RootLayout({
         <Dock />
         <CommandPalette />
 
+        {/* top & bottom shadow – pointer-events:none so it never steals scroll */}
+        <div
+          className="pointer-events-none fixed inset-x-0 top-0 h-40
+                        bg-gradient-to-b from-black/60 to-transparent z-40"
+        />
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-0 h-40
+                        bg-gradient-to-t from-black/60 to-transparent z-40"
+        />
+
         {/* page sections mount here */}
         {children}
       </body>
