@@ -57,6 +57,8 @@ function useTriangleTracker(stickyLinePx: number) {
   const nodeMap = useRef<Record<string, { x: number; getY: () => number }>>({});
   const [centerId, setCenterId] = useState<string | null>(null);
   const [x, setX] = useState(0);
+  const [y, setY] = useState(0); // ★ NEW
+  const [ready, setReady] = useState(false);
 
   useLayoutEffect(() => {
     let frame = 0;
@@ -66,7 +68,6 @@ function useTriangleTracker(stickyLinePx: number) {
       frame = requestAnimationFrame(() => {
         frame = 0;
 
-        /* nearest node to sticky line */
         let bestId: string | null = null;
         let bestDist = Infinity;
         Object.entries(nodeMap.current).forEach(([id, n]) => {
@@ -77,23 +78,28 @@ function useTriangleTracker(stickyLinePx: number) {
           }
         });
 
-        if (bestId && bestId !== centerId) {
+        if (!bestId) return;
+
+        const n = nodeMap.current[bestId];
+        setY(n.getY()); // ★ track Y every frame
+
+        if (bestId !== centerId) {
           setCenterId(bestId);
-          setX(nodeMap.current[bestId].x);
+          setX(n.x);
         }
+        if (!ready) setReady(true);
       });
     };
 
     window.addEventListener("scroll", recalc, { passive: true });
     window.addEventListener("resize", recalc);
-    recalc(); // initial pass
-
+    recalc(); // first run
     return () => {
       window.removeEventListener("scroll", recalc);
       window.removeEventListener("resize", recalc);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [centerId, stickyLinePx]);
+  }, [centerId, stickyLinePx, ready]);
 
   const register = (id: string, el: HTMLDivElement | null) => {
     if (!el) return;
@@ -104,23 +110,31 @@ function useTriangleTracker(stickyLinePx: number) {
     };
   };
 
-  return { x, centerId, register };
+  return { x, y, centerId, register, ready };
 }
 
 /* ─────────── component ─────────── */
 interface TimelineProps {
   rows: typeof timelineRows;
-  headerRef: React.RefObject<HTMLElement>;
+  headerRef?: React.RefObject<HTMLElement>;
+  stickyOffset?: number;
 }
 
-export default function Timeline({ rows, headerRef }: TimelineProps) {
+export default function Timeline({
+  rows,
+  headerRef,
+  stickyOffset = 80,
+}: TimelineProps) {
   /* sticky-line position = header bottom (updates on scroll / resize) */
-  const [stickyY, setStickyY] = useState(0);
+  const [stickyY, setStickyY] = useState(stickyOffset);
   useLayoutEffect(() => {
-    const measure = () => {
-      if (headerRef.current)
-        setStickyY(headerRef.current.getBoundingClientRect().bottom);
-    };
+    if (!headerRef?.current) {
+      setStickyY(stickyOffset); // one-off set; no listeners needed
+      return;
+    }
+    const measure = () =>
+      setStickyY(headerRef.current!.getBoundingClientRect().bottom);
+
     measure();
     window.addEventListener("scroll", measure, { passive: true });
     window.addEventListener("resize", measure);
@@ -128,7 +142,7 @@ export default function Timeline({ rows, headerRef }: TimelineProps) {
       window.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
-  }, [headerRef]);
+  }, [headerRef, stickyOffset]);
 
   /* build vertical bars for child branches */
   type Segment = { branch: BranchId; top: number; height: number };
@@ -152,7 +166,14 @@ export default function Timeline({ rows, headerRef }: TimelineProps) {
   });
 
   /* tracker */
-  const { x: triX, centerId, register } = useTriangleTracker(stickyY);
+  //const { x: triX, centerId, register } = useTriangleTracker(stickyY);
+  const {
+    x: triX,
+    y: triY,
+    centerId,
+    register,
+    ready,
+  } = useTriangleTracker(stickyY);
   const activeBranch = centerId?.split("-").pop() as BranchId | undefined;
 
   /* ─────────── render ─────────── */
@@ -167,11 +188,13 @@ export default function Timeline({ rows, headerRef }: TimelineProps) {
     >
       {/* glowing radial light source */}
       <div
-        className="pointer-events-none"
+        className="pointer-events-none transition-opacity duration-200"
         style={{
           position: "fixed",
-          top: stickyY - 60, // centre 120-px circle
+          /* clamp: follow node *until* it reaches stickyY, then pin */
+          top: Math.max(stickyY, triY) - 60,
           left: 0,
+          opacity: ready ? 1 : 0,
           transform: `translateX(${triX - 60}px)`,
           width: 120,
           height: 120,
@@ -180,7 +203,9 @@ export default function Timeline({ rows, headerRef }: TimelineProps) {
             "radial-gradient(circle at center, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)",
           mixBlendMode: "screen",
           filter: "blur(12px)",
-          transition: "transform 400ms cubic-bezier(.25,1,.5,1)",
+          transitionProperty: "transform, opacity, top",
+          transitionTimingFunction: "cubic-bezier(.25,1,.5,1)",
+          transitionDuration: "400ms",
           zIndex: 35,
         }}
       />
