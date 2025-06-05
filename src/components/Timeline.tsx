@@ -14,7 +14,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import { timelineRows, BranchId, TimelineRow } from "@/data/timeline";
 import { branchOrder, branchColor } from "@/data/branchPalette";
 
-const COL_W = 120; // width of one branch column
+export const COL_W = 120; // width of one branch column
 const ROW_H = 120; // height of one timeline row
 const LINE_W = 4; // stroke / bar thickness
 const NODE_R = 8; // node radius (16×16 circle)
