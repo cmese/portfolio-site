@@ -1,12 +1,3 @@
-/*  Animated Git-style timeline with glow tracker
-    ────────────────────────────────────────────────────────────
-    • Idle branches render at 20 % opacity (“dim”).
-    • The branch under the fixed light source brightens and gains a glow.
-    • A radial-gradient overlay (mix-blend-mode: screen) acts as the moving
-      light source; its X position is driven by the tracker logic while
-      its Y is fixed to the sticky header’s bottom edge.
-*/
-
 "use client";
 
 import React, { useRef, useState, useLayoutEffect } from "react";
@@ -21,18 +12,18 @@ const NODE_R = 8; // node radius (16×16 circle)
 const OFFSET = 26; // vertical nudge for first / last child nodes
 
 /* ─────────── helpers ─────────── */
-/* x-centre of any column */
+/* x-centre of any column (document-relative) */
 const colX = (b: (typeof branchOrder)[number]) =>
   branchOrder.indexOf(b) * COL_W + COL_W / 2;
 
-/* baseline y-centre of a row */
+/* baseline y-centre of a row (document-relative) */
 const rowY = (idx: number) => idx * ROW_H + ROW_H / 2;
 
 /* special y-centre with offset logic */
 function nodeY(rowIdx: number, branch: BranchId, row: TimelineRow) {
   const base = rowY(rowIdx);
   if (row.split === branch) return base + OFFSET; // first child node ↓
-  if (row.merge === branch) return base - OFFSET; // last  child node ↑
+  if (row.merge === branch) return base - OFFSET; // last child node ↑
   return base; // regular node
 }
 
@@ -48,16 +39,30 @@ const withAlpha = (hex: string, a: number) => {
 /* lookup tables */
 const idleColor = Object.fromEntries(
   Object.entries(branchColor).map(([k, v]) => [k, withAlpha(v, 0.2)])
-) as Record<BranchId, string>; // dim 20 % opacity
+) as Record<BranchId, string>; // dim 20% opacity
 
 const brightColor = branchColor; // full tint for active branch
 
 /* ═════════════ tracker hook ═════════════ */
-function useTriangleTracker(stickyLinePx: number) {
-  const nodeMap = useRef<Record<string, { x: number; getY: () => number }>>({});
+/**
+ * - Accepts `stickyLinePx` (Y in viewport) and a ref to the timeline container.
+ * - Registers each node's center in viewport coords, then calculates:
+ *     triX_container = node_centerX_in_viewport  – container_left_in_viewport
+ *     triY_container = node_centerY_in_viewport  – container_top_in_viewport
+ *
+ * - Picks whichever node is closest to the sticky line (in viewport space).
+ * - Returns (x, y) **relative to the container** so that the glow can be `position: absolute` inside it.
+ */
+function useTriangleTracker(
+  stickyLinePx: number,
+  containerRef: React.RefObject<HTMLDivElement | null>
+) {
+  const nodeMap = useRef<Record<string, { centerX: number; centerY: number }>>(
+    {}
+  );
   const [centerId, setCenterId] = useState<string | null>(null);
-  const [x, setX] = useState(0);
-  const [y, setY] = useState(0); // ★ NEW
+  const [x, setX] = useState(0); // container-relative X for the glow center
+  const [y, setY] = useState(0); // container-relative Y for the glow center
   const [ready, setReady] = useState(false);
 
   useLayoutEffect(() => {
@@ -67,46 +72,65 @@ function useTriangleTracker(stickyLinePx: number) {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
+        if (!containerRef.current) return;
 
+        // Measure container's viewport position
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const containerLeft = containerRect.left;
+        const containerTop = containerRect.top;
+
+        // Find which node is closest (in viewport-space) to the sticky line:
         let bestId: string | null = null;
         let bestDist = Infinity;
-        Object.entries(nodeMap.current).forEach(([id, n]) => {
-          const d = Math.abs(n.getY() - stickyLinePx);
-          if (d < bestDist) {
-            bestDist = d;
+        Object.entries(nodeMap.current).forEach(([id, pos]) => {
+          const dist = Math.abs(pos.centerY - stickyLinePx);
+          if (dist < bestDist) {
+            bestDist = dist;
             bestId = id;
           }
         });
-
         if (!bestId) return;
 
-        const n = nodeMap.current[bestId];
-        setY(n.getY()); // ★ track Y every frame
+        // Grab that node's viewport center:
+        const chosen = nodeMap.current[bestId];
+        // Convert to container-relative coordinates:
+        const x_in_container = chosen.centerX - containerLeft;
+        const y_in_container = chosen.centerY - containerTop;
 
+        // Update center ID if changed; always update X/Y so it's never stale
         if (bestId !== centerId) {
           setCenterId(bestId);
-          setX(n.x);
         }
-        if (!ready) setReady(true);
+        setX(x_in_container);
+        setY(y_in_container);
+
+        if (!ready) {
+          setReady(true);
+        }
       });
     };
 
     window.addEventListener("scroll", recalc, { passive: true });
     window.addEventListener("resize", recalc);
-    recalc(); // first run
+    recalc(); // initial measurement
     return () => {
       window.removeEventListener("scroll", recalc);
       window.removeEventListener("resize", recalc);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [centerId, stickyLinePx, ready]);
+  }, [centerId, stickyLinePx, ready, containerRef]);
 
+  /**
+   * When a node's <div> mounts, register its viewport center.
+   * We store `centerX` and `centerY` here; on each recalc, re-measure them.
+   */
   const register = (id: string, el: HTMLDivElement | null) => {
     if (!el) return;
     const rect = () => el.getBoundingClientRect();
+    // We store the current viewport center of this node:
     nodeMap.current[id] = {
-      x: rect().left + rect().width / 2,
-      getY: () => rect().top + rect().height / 2,
+      centerX: rect().left + rect().width / 2,
+      centerY: rect().top + rect().height / 2,
     };
   };
 
@@ -125,11 +149,14 @@ export default function Timeline({
   headerRef,
   stickyOffset = 80,
 }: TimelineProps) {
-  /* sticky-line position = header bottom (updates on scroll / resize) */
+  // ref to the root <div> for computing container coordinates
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  /* sticky-line position = header bottom (viewport-space) */
   const [stickyY, setStickyY] = useState(stickyOffset);
   useLayoutEffect(() => {
     if (!headerRef?.current) {
-      setStickyY(stickyOffset); // one-off set; no listeners needed
+      setStickyY(stickyOffset);
       return;
     }
     const measure = () =>
@@ -165,37 +192,50 @@ export default function Timeline({
     }
   });
 
-  /* tracker */
-  //const { x: triX, centerId, register } = useTriangleTracker(stickyY);
+  //tracker for the glowing radial light source
   const {
     x: triX,
     y: triY,
     centerId,
     register,
     ready,
-  } = useTriangleTracker(stickyY);
+  } = useTriangleTracker(stickyY, containerRef);
   const activeBranch = centerId?.split("-").pop() as BranchId | undefined;
 
   /* ─────────── render ─────────── */
   return (
     <div
+      ref={containerRef}
       className="relative"
       style={{
         display: "grid",
+        marginTop: 100,
+        marginBottom: 100,
         gridTemplateColumns: `repeat(${branchOrder.length}, ${COL_W}px)`,
         gridTemplateRows: `repeat(${timelineRows.length}, ${ROW_H}px)`,
       }}
     >
-      {/* glowing radial light source */}
+      {/* 
+        glowing radial light source 
+        • Changed from `position: fixed` → `position: absolute` 
+        • Now `top` and `left` are in container-relative pixels (triX, triY are already container-relative). 
+        • We still clamp: follow node until it reaches stickyY (viewport-space), 
+          then “pin” at stickyY—but converted to container space by subtracting container top.
+      */}
       <div
         className="pointer-events-none transition-opacity duration-200"
         style={{
-          position: "fixed",
-          /* clamp: follow node *until* it reaches stickyY, then pin */
-          top: Math.max(stickyY, triY) - 60,
-          left: 0,
+          position: "absolute", // ← was "fixed"
+          // Convert stickyY (viewport) to container space: stickyY - container.top
+          // But triY is already in container space, so:
+          top:
+            Math.max(
+              stickyY -
+                (containerRef.current?.getBoundingClientRect().top ?? 0),
+              triY
+            ) - 60,
+          left: triX - 60, // triX is container-relative, so no further subtraction
           opacity: ready ? 1 : 0,
-          transform: `translateX(${triX - 60}px)`,
           width: 120,
           height: 120,
           borderRadius: "50%",
@@ -207,19 +247,6 @@ export default function Timeline({
           transitionTimingFunction: "cubic-bezier(.25,1,.5,1)",
           transitionDuration: "400ms",
           zIndex: 35,
-        }}
-      />
-
-      {/* invisible tracker (keeps translateX maths unchanged) */}
-      <div
-        style={{
-          position: "fixed",
-          opacity: 0,
-          top: stickyY,
-          left: 0,
-          width: 24,
-          height: 24,
-          transform: `translateX(${triX - 12}px)`,
         }}
       />
 
@@ -417,7 +444,7 @@ export default function Timeline({
             <Tooltip.Root open={centerId === id}>
               <Tooltip.Trigger asChild>
                 <div
-                  ref={(el) => register(id, el)}
+                  ref={(el) => register(id, el)} // we still register viewport positions
                   style={{
                     position: "absolute",
                     left: colX(branch) - NODE_R,

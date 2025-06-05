@@ -24,7 +24,7 @@ export default function Experience() {
   return (
     <motion.section
       id="experience"
-      className="min-h-screen flex flex-col justify-center -mt-[60vh] py-20 relative z-10"
+      className="min-h-screen flex flex-col justify-center -mt-[60vh] relative z-10"
       initial={false}
     >
       {/* wrapper centres the grid; no transforms (so BCRs stay right) */}
