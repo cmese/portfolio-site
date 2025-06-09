@@ -11,13 +11,31 @@ import { useScrollTracker } from "./timeline/useScrollTracker";
 
 interface TimelineProps {
   rows: typeof timelineRows;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  firstNodeRef: React.RefObject<HTMLDivElement | null>;
+  lastNodeRef: React.RefObject<HTMLDivElement | null>;
+  registerNode: ReturnType<typeof useScrollTracker>["registerNode"];
+  ready: boolean;
+  spotlightX: number;
+  spotlightY: number;
+  scrollPhase: "phase1" | "phase2" | "phase3";
+  centerId: string | null;
+  containerTransform: number;
 }
 
-export default function Timeline({ rows }: TimelineProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const firstNodeRef = useRef<HTMLDivElement | null>(null);
-  const lastNodeRef = useRef<HTMLDivElement | null>(null);
-
+export default function Timeline({
+  rows,
+  containerRef,
+  firstNodeRef,
+  lastNodeRef,
+  registerNode,
+  ready,
+  spotlightX,
+  spotlightY,
+  scrollPhase,
+  centerId,
+  containerTransform,
+}: TimelineProps) {
   /* Precompute vertical segments for child‐branch lines */
   type Segment = { branch: BranchId; top: number; height: number };
   const segments: Segment[] = [];
@@ -36,17 +54,6 @@ export default function Timeline({ rows }: TimelineProps) {
       started[row.merge] = null;
     }
   });
-
-  /* Hook into scroll logic */
-  const {
-    centerId,
-    spotlightX,
-    spotlightY,
-    scrollPhase,
-    ready,
-    registerNode,
-    containerTransform,
-  } = useScrollTracker(containerRef, firstNodeRef, lastNodeRef);
 
   // Which branch is active? (e.g. "main", "featureX", etc.)
   const activeBranch = centerId?.split("-").pop() as BranchId | undefined;
@@ -194,11 +201,11 @@ export default function Timeline({ rows }: TimelineProps) {
         }}
       />
 
-      {/* Debug box */}
+      {/* Debug box 
       <div className="sticky top-4 left-100 bg-black/70 text-white px-3 py-2 rounded text-sm z-50 font-mono">
         <div>Phase: {scrollPhase}</div>
         <div>Active: {centerId || "none"}</div>
-      </div>
+      </div>*/}
 
       {/* Main branch node & vertical line */}
       <div

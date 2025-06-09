@@ -37,19 +37,25 @@ export function useScrollTracker(
   const [scrollAtLast80, setScrollAtLast80] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
 
+  // horizontal progress for section animation
+  const [hProgress, setHProgress] = useState(0);
+
   /* ───────── measure break-points once ───────── */
   useLayoutEffect(() => {
     if (!containerRef.current || !firstNodeRef.current || !lastNodeRef.current)
       return;
 
     const fRect = firstNodeRef.current.getBoundingClientRect();
-    const fCenterY = window.scrollY + fRect.top + fRect.height / 2;
+    const visualOffset = 48; // adjust with transform in timeline-wrapper (see Experience.tsx)
+    const fCenterY =
+      window.scrollY + fRect.top + fRect.height / 2 - visualOffset;
     const desired20 = window.innerHeight * 0.2;
     setScrollAtFirst20(fCenterY - desired20);
     log("scrollAtFirst20 =", fCenterY - desired20);
 
     const lRect = lastNodeRef.current.getBoundingClientRect();
-    const lCenterY = window.scrollY + lRect.top + lRect.height / 2;
+    const lCenterY =
+      window.scrollY + lRect.top + lRect.height / 2 - visualOffset;
     const desired50 = window.innerHeight * 0.5;
     const desired80 = window.innerHeight * 0.8;
 
@@ -131,6 +137,9 @@ export function useScrollTracker(
           );
         }
 
+        const p = Math.min(1, Math.max(0, y / scrollAtFirst20)); // 0→1
+        setHProgress(p);
+
         setScrollPhase(phase);
         setCenterId(chosenId);
         setSpotlightX(outX);
@@ -185,6 +194,7 @@ export function useScrollTracker(
     spotlightX,
     spotlightY,
     scrollPhase,
+    hProgress,
     ready,
     registerNode,
     containerTransform,
