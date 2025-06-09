@@ -85,7 +85,7 @@ export function useScrollTracker(
         const nodes = nodePositions.current;
         if (!nodes.length) return;
         const first = nodes[0];
-        //const last = nodes[nodes.length - 1];
+        const last = nodes[nodes.length - 1];
 
         let transform = 0; //TODO
         let chosenId: string | null = null;
@@ -98,21 +98,30 @@ export function useScrollTracker(
           outX = first.x;
           outY = first.y;
         } else {
-          transform = 0; //TODO
-          // TODO: animate instead of snap between nodes, also this closest node causes backward jumps
+          transform = 0;
+
+          /* 1. clamp scroll progress to [0‥1] */
           const t = (y - scrollAtFirst20) / (scrollAtLast80 - scrollAtFirst20);
           const f = Math.max(0, Math.min(1, t));
+
+          /* 2. floating-point index along node list */
           const floatIdx = f * (nodes.length - 1);
           const i0 = Math.floor(floatIdx);
           const i1 = Math.min(i0 + 1, nodes.length - 1);
-          const frac = floatIdx - i0;
+
+          /* 3. linear interpolation between the two nodes */
+          const frac = floatIdx - i0; // 0 → 1
           const a = nodes[i0];
           const b = nodes[i1];
-          const useA = frac < 0.5;
-          const n = useA ? a : b;
-          chosenId = n.id;
-          outX = n.x;
-          outY = n.y;
+
+          /*    spotlight position = lerp(a, b)                    */
+          outX = a.x + (b.x - a.x) * frac;
+          outY = a.y + (b.y - a.y) * frac;
+
+          /* 4. active (bright-color) node = the next LOWER node   */
+          /*    ceil guarantees no backwards jumps.     */
+          const chosenIdx = Math.ceil(floatIdx);
+          chosenId = nodes[chosenIdx].id;
         }
 
         // DEBUG: log every 100 px to avoid spam
@@ -163,7 +172,7 @@ export function useScrollTracker(
     if (idx >= 0) nodePositions.current[idx] = node;
     else nodePositions.current.push(node);
 
-    nodePositions.current.sort((a, b) => a.rowIndex - b.rowIndex);
+    nodePositions.current.sort((a, b) => a.y - b.y); // keeps true top-to-bottom order
 
     // DEBUG: log once per node registration
     log("register node", node);
