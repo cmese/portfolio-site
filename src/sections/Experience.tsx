@@ -7,6 +7,7 @@ import { useBuiltTimeline } from "@/hooks/useBuiltTimeline";
 import { useScrollTracker } from "@/components/timeline/useScrollTracker";
 
 // details for each node (super-simple placeholder)
+import { nodes, details } from "@/data/meTimeline"; // ⬅️ add this
 import DetailCard from "@/components/timeline/DetailCard";
 import { RxRowSpacing } from "react-icons/rx";
 
@@ -88,7 +89,14 @@ export default function Experience() {
             className="px-6 md:px-12"
             style={{ opacity: rtOpacity, transition: "opacity 0.3s ease" }}
           >
-            {centerId && <DetailCard nodeId={centerId} />}
+            {centerId && (
+              <DetailCard
+                centerId={centerId} // from your scroll tracker
+                rows={built.rows} // from buildTimeline(...)
+                nodes={nodes} // your authoring data
+                detailsMap={details} // your TLDetails
+              />
+            )}
           </aside>
         </div>
 
