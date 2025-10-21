@@ -3,11 +3,12 @@
 
 import { useRef } from "react";
 import Timeline from "@/components/Timeline";
-import { timelineRows } from "@/data/timeline";
+import { useBuiltTimeline } from "@/hooks/useBuiltTimeline";
 import { useScrollTracker } from "@/components/timeline/useScrollTracker";
 
 // details for each node (super-simple placeholder)
 import DetailCard from "@/components/timeline/DetailCard";
+import { RxRowSpacing } from "react-icons/rx";
 
 export default function Experience() {
   /* ── 1. refs that Timeline needs ─────────────────────────────── */
@@ -27,6 +28,8 @@ export default function Experience() {
     scrollPhase,
     containerTransform,
   } = useScrollTracker(containerRef, firstNodeRef, lastNodeRef);
+
+  const built = useBuiltTimeline(); // { rows, segments, idxById }
 
   /* ── 3. map horizontal progress to a 2-column grid layout ────── */
   const tlWidth = `calc(${100 - hProgress * 50}% )`; // 100 → 50 %
@@ -65,7 +68,8 @@ export default function Experience() {
             }}
           >
             <Timeline
-              rows={timelineRows}
+              rows={built.rows}
+              segments={built.segments}
               containerRef={containerRef}
               firstNodeRef={firstNodeRef}
               lastNodeRef={lastNodeRef}

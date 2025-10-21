@@ -1,79 +1,53 @@
-export type BranchId = "main" | "school" | "work" | "edu";
+export type BranchId = "main" | "school" | "work" | "edu" | (string & {});
 
+// Derived row shape renderer already understands
 export interface TimelineRow {
-  id: string; // unique key
-  node: BranchId; // branch that gets a circle on this row
-  message: string; // tooltip
-  split?: BranchId; // child branch that starts here
-  parent?: BranchId; // required if split is present (who it splits from)
-  merge?: BranchId; // child branch that ends (merges) here
+  id: string;
+  node: BranchId;
+  message: string;
+  split?: BranchId;
+  parent?: BranchId;
+  merge?: BranchId;
 }
 
-/* ---- demo rows ---- */
-// timeline.ts   — append / edit rows only
-export const timelineRows: TimelineRow[] = [
-  { id: "r1", node: "main", message: "Birth of Chris" },
-  { id: "r2", node: "main", message: "First PC" },
+// Authoring types (layout-agnostic)
+export type NodeKind = "milestone" | "split" | "merge";
+export interface TLNode {
+  id: string;
+  kind: NodeKind;
+  branch: BranchId;
+  title: string;
+  /** Optional ordering index if not using dates */
+  dateIndex?: number;
+  /** Key for right-panel content */
+  detailsId?: string;
+}
+export interface BranchSpan {
+  branch: BranchId; // child branch
+  parent: BranchId; // parent branch
+  startsAt: string; // node id where child splits
+  /** node id where child megerges. When omitted or set to "__END__", the branch stays open to the last relevant row */
+  endsAt?: string | "__END__";
+}
 
-  /* school branch born off main */
-  {
-    id: "r3",
-    node: "main",
-    message: "Start School",
-    split: "school",
-    parent: "main",
-  },
+// Precomputed vertical child-branch segments for rendering
+export type Segment = { branch: BranchId; top: number; height: number };
 
-  /* extra main nodes while school is alive */
-  {
-    id: "r4",
-    node: "main",
-    message: "Built first website",
-    split: "work",
-    parent: "main",
-  },
-  {
-    id: "r5",
-    node: "main",
-    message: "Joined chess club",
-    merge: "work",
-    parent: "main",
-  },
+export interface BuiltTimeline {
+  rows: TimelineRow[];
+  segments: Segment[];
+  idxById: Map<string, number>;
+}
 
-  /* -------------     SCHOOL branch nodes     ------------- */
-  { id: "r6", node: "school", message: "HS Coding Club" },
+// Optional richer right-panel content map
+export interface TLDetails {
+  [detailsId: string]: {
+    title: string;
+    summary?: string;
+    bullets?: string[];
+    links?: { label: string; href: string }[];
+    media?: { src: string; alt: string }[];
+  };
+}
 
-  /* >>> third-to-last school node — edu splits here <<< */
-  {
-    id: "r7",
-    node: "school",
-    message: "Boot-camp Enrol",
-    split: "edu",
-    parent: "school",
-  },
-
-  /* edu branch content */
-  { id: "r8", node: "edu", message: "Boot-camp Homework" },
-
-  /* >>> second-to-last school node — edu merges back <<< */
-  {
-    id: "r9",
-    node: "school",
-    message: "Boot-camp Done",
-    merge: "edu",
-    parent: "school",
-  },
-
-  { id: "r10", node: "school", message: "CS Degree" }, // last school node
-
-  /* school merges back into main */
-  {
-    id: "r11",
-    node: "main",
-    message: "Graduated",
-    merge: "school",
-    parent: "main",
-  },
-
-  { id: "r12", node: "main", message: "First Dev Job" },
-];
+// (moved demo data to src/data/meTimeline.ts)

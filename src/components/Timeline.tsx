@@ -2,7 +2,7 @@
 
 import React, { useRef } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { timelineRows, BranchId, TimelineRow } from "@/data/timeline";
+import { BranchId, TimelineRow, Segment } from "@/data/timeline";
 import { branchOrder, branchColor } from "@/data/branchPalette";
 
 import { COL_W, ROW_H, LINE_W, NODE_R, nodeY, colX } from "./timeline/geometry";
@@ -10,7 +10,8 @@ import { idleColor, brightColor } from "./timeline/colors";
 import { useScrollTracker } from "./timeline/useScrollTracker";
 
 interface TimelineProps {
-  rows: typeof timelineRows;
+  rows: TimelineRow[];
+  segments: Segment[];
   containerRef: React.RefObject<HTMLDivElement | null>;
   firstNodeRef: React.RefObject<HTMLDivElement | null>;
   lastNodeRef: React.RefObject<HTMLDivElement | null>;
@@ -25,6 +26,7 @@ interface TimelineProps {
 
 export default function Timeline({
   rows,
+  segments,
   containerRef,
   firstNodeRef,
   lastNodeRef,
@@ -36,25 +38,6 @@ export default function Timeline({
   centerId,
   containerTransform,
 }: TimelineProps) {
-  /* Precompute vertical segments for child‐branch lines */
-  type Segment = { branch: BranchId; top: number; height: number };
-  const segments: Segment[] = [];
-  const started: Record<string, number | null> = {};
-  rows.forEach((row, i) => {
-    if (row.split) started[row.split] = i;
-    if (row.merge && started[row.merge] !== null) {
-      const sIdx = started[row.merge] as number;
-      const startY = nodeY(sIdx, row.merge, rows[sIdx]);
-      const endY = nodeY(i, row.merge, row);
-      segments.push({
-        branch: row.merge,
-        top: startY + NODE_R,
-        height: endY - NODE_R - (startY + NODE_R),
-      });
-      started[row.merge] = null;
-    }
-  });
-
   // Which branch is active? (e.g. "main", "featureX", etc.)
   const activeBranch = centerId?.split("-").pop() as BranchId | undefined;
 
