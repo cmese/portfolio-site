@@ -20,9 +20,12 @@ export default function TagFilter({
 
   return (
     <div
-      className="sticky z-20 -mx-6 md:-mx-12 top-[var(--header-offset,64px)]
-                 bg-white/70 dark:bg-neutral-900/60 backdrop-blur supports-[backdrop-filter]:backdrop-blur
-                 px-6 md:px-12 py-3 border-b border-black/5 dark:border-white/10"
+      className="sticky top-0 z-[70] -mx-6 md:-mx-12
+             /* make the backdrop mostly opaque to block the global gradient */
+             bg-neutral-900/95 dark:bg-neutral-900/95
+             backdrop-blur-md
+             px-6 md:px-12 py-3
+             border-b border-black/5 dark:border-white/10"
     >
       <div className="flex items-center justify-between gap-3 mb-2">
         <h2 className="text-2xl font-semibold">Projects</h2>

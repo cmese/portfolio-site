@@ -37,20 +37,28 @@ export default function Projects() {
   );
 
   return (
-    <section id="projects" className="min-h-screen px-6 md:px-12 pb-24">
+    <section
+      id="projects"
+      className="
+     relative isolate
+     min-h-screen
+     px-6 md:px-12
+     pt-2
+     pb-24
+     z-[40]
+   "
+    >
       <TagFilter
         allTags={allTags}
         selected={selected}
         onToggle={toggleTag}
         onClear={clearTags}
       />
-
       <div className="mt-6 grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((p) => (
           <ProjectCard key={p.id} project={p} onOpen={setOpenId} />
         ))}
       </div>
-
       {active && (
         <ProjectSheet
           open={!!active}

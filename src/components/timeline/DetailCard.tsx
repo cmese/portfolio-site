@@ -57,7 +57,7 @@ export default function DetailCard({
   const media = resolved.det?.media ?? [];
 
   return (
-    <aside className="sticky top-10 space-y-4">
+    <aside className="sticky top-10 space-y-4 z-[30]">
       <div className="opacity-60 text-xs uppercase tracking-wide">
         Now viewing
       </div>

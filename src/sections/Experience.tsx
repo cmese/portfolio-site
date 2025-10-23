@@ -25,7 +25,7 @@ export default function Experience() {
   const firstNodeRef = useRef<HTMLDivElement | null>(null);
   const lastNodeRef = useRef<HTMLDivElement | null>(null);
 
-  const activeId = useActiveSection(["experience"]);
+  const activeId = useActiveSection(["experience", "projects"]);
   const { setProgress, progress } = useTimelineProgress();
 
   const TIMELINE_OFFSET_Y = 80; // matches transform in timeline-wrapper
@@ -67,18 +67,24 @@ export default function Experience() {
     0,
     Math.min(1, (progress - OVERLAY_START) / (OVERLAY_END - OVERLAY_START))
   );
-  const overlayOpacity = clamped; // 0→1 between start/end
-  const overlayOpacityFinal = overlayOpacity * nextFade;
-  const showOverlay = isNarrow && !!centerId && overlayOpacityFinal > 0.02; // small hysteresis
+  // Base fade from timeline progress and next-section visibility
+  const baseOpacity = clamped * nextFade; // 0→1 between start/end, then fades as projects appears
+
+  // Gate with active section so it can’t re-appear later (e.g., when projects scrolls out)
+  // IMPORTANT: using the gate ONLY in opacity, not in the mount condition.
+  const expGate = activeId === "experience" ? 1 : 0;
+  const overlayOpacityFinal = baseOpacity * expGate;
+
+  // Keep mounted if:
+  //  - we’re on narrow + have a node, AND
+  //  - either Experience is still the active section (so we can fade), OR
+  //  - baseOpacity is still above a tiny threshold (finish the fade-out)
+  const showOverlay =
+    isNarrow && !!centerId && (activeId === "experience" || baseOpacity > 0.02);
 
   // visual knobs
   const DETAIL_W = "clamp(320px, 38vw, 560px)"; // min, fluid, max
   const GUTTER = "clamp(16px, 4vw, 56px)"; // spacing between timeline and details
-
-  // same center-to-left padding used for timeline:
-  const centerPadExpr = `(50vw - 60px) * ${1 - hProgress}`;
-  // dynamic gap follows the padding until it reaches just the base gutter:
-  const dynamicGapExpr = `calc(${GUTTER} + ${centerPadExpr})`;
 
   /* ── 3. map horizontal progress to a 2-column grid layout ────── */
   const rtOpacity = hProgress; //   0 → 1
@@ -95,7 +101,7 @@ export default function Experience() {
   console.log("Experience: showOverlay =", showOverlay);
 
   return (
-    <section id="experience" className="relative">
+    <section id="experience" className="relative pb-24">
       <div
         id="timeline-wrapper"
         className="will-change-transform"
@@ -141,7 +147,7 @@ export default function Experience() {
             <aside
               className="px-6 md:px-12"
               style={{
-                opacity: rtOpacity * nextFade,
+                opacity: rtOpacity * nextFade * expGate,
                 transition: "opacity 0.3s ease",
                 width: DETAIL_W,
                 // animate the aside’s offset as before, but aside is NOT sticky anymore
@@ -184,7 +190,7 @@ export default function Experience() {
         {showOverlay && (
           <Portal>
             <div
-              className="fixed z-40"
+              className="fixed z-[70]"
               style={{
                 /* responsive right / left gutters: min, prefers, max */
                 ["--ov-right" as any]: "clamp(40px, 80px, 120px)", // maximum space from the right edge
@@ -204,7 +210,7 @@ export default function Experience() {
                 backdropFilter: "blur(8px)",
                 background: "rgba(24,24,24,0.72)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                opacity: overlayOpacityFinal, // timeline progress fade * next section fade
+                opacity: overlayOpacityFinal, // timeline progress fade * next section fade * exp gate
                 // opacity: showOverlay ? rtOpacity : 0,
                 transition: "opacity 0.3s ease, transform 0.3s ease",
                 transform: `translateX(${(1 - overlayOpacityFinal) * 24}px)`,
@@ -222,18 +228,6 @@ export default function Experience() {
             </div>
           </Portal>
         )}
-
-        {/* footer spacer under timeline */}
-        <div
-          className="pointer-events-none"
-          style={{
-            /* 96 px visual space after timeline */ position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: -96,
-            height: 96,
-          }}
-        />
       </div>
     </section>
   );
