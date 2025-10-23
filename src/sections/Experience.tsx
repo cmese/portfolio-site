@@ -6,6 +6,7 @@ import Timeline from "@/components/Timeline";
 import { useBuiltTimeline } from "@/hooks/useBuiltTimeline";
 import { useScrollTracker } from "@/hooks/useScrollTracker";
 import { useTimelineProgress } from "@/contexts/TimelineProgress";
+import { useNextSectionFade } from "@/hooks/useNextSectionFade";
 
 // details for each node (super-simple placeholder)
 import { nodes, details } from "@/data/meTimeline"; // ⬅️ add this
@@ -15,7 +16,8 @@ import { useMedia } from "@/hooks/useMedia";
 import Portal from "@/components/Portal";
 import { COL_W } from "@/components/timeline/geometry";
 import { branchOrder } from "@/data/branchPalette";
-import useActiveSection from "@/utils/useActiveSection";
+import useActiveSection from "@/hooks/useActiveSection";
+import GlowingTitle from "@/components/GlowingTitle";
 
 export default function Experience() {
   /* ── 1. refs that Timeline needs ─────────────────────────────── */
@@ -59,12 +61,15 @@ export default function Experience() {
   const OVERLAY_START = 0.55; // start showing around 55% of slide-in
   const OVERLAY_END = 0.75; // fully visible by 75%
 
+  const nextFade = useNextSectionFade("projects", 0.5, 1.0); // start fade at 50% visible
+
   const clamped = Math.max(
     0,
     Math.min(1, (progress - OVERLAY_START) / (OVERLAY_END - OVERLAY_START))
   );
   const overlayOpacity = clamped; // 0→1 between start/end
-  const showOverlay = isNarrow && !!centerId && overlayOpacity > 0;
+  const overlayOpacityFinal = overlayOpacity * nextFade;
+  const showOverlay = isNarrow && !!centerId && overlayOpacityFinal > 0.02; // small hysteresis
 
   // visual knobs
   const DETAIL_W = "clamp(320px, 38vw, 560px)"; // min, fluid, max
@@ -134,22 +139,43 @@ export default function Experience() {
           {/* right: Details (column on wide, overlay on narrow) */}
           {!isNarrow ? (
             <aside
-              className="px-6 md:px-12 sticky top-10"
+              className="px-6 md:px-12"
               style={{
-                opacity: rtOpacity,
+                opacity: rtOpacity * nextFade,
                 transition: "opacity 0.3s ease",
                 width: DETAIL_W,
+                // animate the aside’s offset as before, but aside is NOT sticky anymore
                 marginLeft: `calc(-1 * (50vw - 60px) * ${1 - hProgress})`,
               }}
             >
-              {centerId && (
-                <DetailCard
-                  centerId={centerId} // from your scroll tracker
-                  rows={built.rows} // from buildTimeline(...)
-                  nodes={nodes} // your authoring data
-                  detailsMap={details} // your TLDetails
-                />
-              )}
+              {/* Make THIS wrapper sticky so title + panel move together */}
+              <div className="sticky top-10">
+                {/* Title sits above the panel (no gray behind it) */}
+                <div className="mb-3 flex justify-center">
+                  <GlowingTitle text="About me" size="md" glow="blue" />
+                </div>
+
+                {/* Panel matches the mobile overlay look */}
+                <div
+                  className="rounded-xl shadow-xl"
+                  style={{
+                    backdropFilter: "blur(8px)",
+                    background: "rgba(24,24,24,0.72)",
+                    boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    padding: "16px 20px",
+                  }}
+                >
+                  {centerId && (
+                    <DetailCard
+                      centerId={centerId}
+                      rows={built.rows}
+                      nodes={nodes}
+                      detailsMap={details}
+                    />
+                  )}
+                </div>
+              </div>
             </aside>
           ) : null}
         </div>
@@ -178,12 +204,15 @@ export default function Experience() {
                 backdropFilter: "blur(8px)",
                 background: "rgba(24,24,24,0.72)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                opacity: overlayOpacity,
+                opacity: overlayOpacityFinal, // timeline progress fade * next section fade
                 // opacity: showOverlay ? rtOpacity : 0,
                 transition: "opacity 0.3s ease, transform 0.3s ease",
-                transform: `translateX(${(1 - overlayOpacity) * 24}px)`,
+                transform: `translateX(${(1 - overlayOpacityFinal) * 24}px)`,
               }}
             >
+              <div className="mb-3 flex justify-center">
+                <GlowingTitle text="About me" size="md" glow="blue" />
+              </div>
               <DetailCard
                 centerId={centerId}
                 rows={built.rows}

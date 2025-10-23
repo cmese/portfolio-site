@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { scrollToId } from "@/utils/scrollToId";
-import useActiveSection from "@/utils/useActiveSection";
+import useActiveSection from "@/hooks/useActiveSection";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import {
