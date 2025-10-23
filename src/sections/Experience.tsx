@@ -10,6 +10,11 @@ import { useScrollTracker } from "@/components/timeline/useScrollTracker";
 import { nodes, details } from "@/data/meTimeline"; // ⬅️ add this
 import DetailCard from "@/components/timeline/DetailCard";
 import { RxRowSpacing } from "react-icons/rx";
+import { useMedia } from "@/hooks/useMedia";
+import Portal from "@/components/Portal";
+import { COL_W } from "@/components/timeline/geometry";
+import { branchOrder } from "@/data/branchPalette";
+import useActiveSection from "@/utils/useActiveSection";
 
 export default function Experience() {
   /* ── 1. refs that Timeline needs ─────────────────────────────── */
@@ -17,7 +22,8 @@ export default function Experience() {
   const firstNodeRef = useRef<HTMLDivElement | null>(null);
   const lastNodeRef = useRef<HTMLDivElement | null>(null);
 
-  /* ── 2. call the scroll-tracker here so we get hProgress ─────── */
+  const activeId = useActiveSection(["experience"]);
+
   const {
     centerId,
     hProgress, // 0 → 1 before phase1
@@ -32,10 +38,31 @@ export default function Experience() {
 
   const built = useBuiltTimeline(); // { rows, segments, idxById }
 
+  // responsive: overlay details on narrow screens
+  const isNarrow = useMedia("(max-width: 900px)");
+
+  // visual knobs
+  const DETAIL_W = "clamp(320px, 38vw, 560px)"; // min, fluid, max
+  const GUTTER = "clamp(16px, 4vw, 56px)"; // spacing between timeline and details
+
+  // same center-to-left padding used for timeline:
+  const centerPadExpr = `(50vw - 60px) * ${1 - hProgress}`;
+  // dynamic gap follows the padding until it reaches just the base gutter:
+  const dynamicGapExpr = `calc(${GUTTER} + ${centerPadExpr})`;
+
   /* ── 3. map horizontal progress to a 2-column grid layout ────── */
-  const tlWidth = `calc(${100 - hProgress * 50}% )`; // 100 → 50 %
-  const rtWidth = `calc(${hProgress * 50}% )`; //   0 → 50 %
   const rtOpacity = hProgress; //   0 → 1
+
+  // timeline pixel width (so we can center→left with a transform, not padding)
+  const TL_W = branchOrder.length * COL_W;
+  // when hProgress = 0, timeline should be roughly centered in the viewport
+  // when hProgress = 1, no horizontal shift (flush-left).
+  const centerOffset = `calc(50vw + 20px - ${TL_W / 4}px)`;
+  const tlShift = `calc(${centerOffset} * ${1 - hProgress})`;
+
+  // overlay shows only when: mobile layout + we have a node + the Experience section is active
+  const showOverlay = isNarrow && !!centerId && activeId === "experience";
+  console.log("Experience: showOverlay =", showOverlay);
 
   return (
     <section id="experience" className="relative">
@@ -47,25 +74,20 @@ export default function Experience() {
         }}
       >
         <div
-          className="
-          grid
-          transition-[grid-template-columns]
-          duration-300 ease-[cubic-bezier(.4,0,.2,1)]
-        "
-          style={{ gridTemplateColumns: `${tlWidth} ${rtWidth}` }}
+          className="grid transition-[grid-template-columns] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          style={{
+            // left column fits the timeline’s actual pixel width
+            gridTemplateColumns: isNarrow ? "1fr" : `max-content ${DETAIL_W}`,
+            columnGap: isNarrow ? 0 : GUTTER,
+          }}
         >
           {/* ──  left column : Timeline  ─────────────────────────── */}
           <div
-            className="
-    overflow-visible
-    transition-[padding-left,padding-right]
-    duration-300 ease-[cubic-bezier(.4,0,.2,1)]
-  "
+            className="overflow-visible"
             style={{
-              /* at hProgress 0  → full centre padding
-       at hProgress 1  → 0   (flush left)       */
-              paddingLeft: `calc((50vw - 60px) * ${1 - hProgress})`,
-              paddingRight: `calc((50vw - 60px) * ${1 - hProgress})`,
+              width: "max-content",
+              transform: `translateX(${tlShift})`,
+              transition: "transform 300ms cubic-bezier(.4,0,.2,1)",
             }}
           >
             <Timeline
@@ -84,21 +106,67 @@ export default function Experience() {
             />
           </div>
 
-          {/* ──  right column : Details  ──────────────────────────── */}
-          <aside
-            className="px-6 md:px-12"
-            style={{ opacity: rtOpacity, transition: "opacity 0.3s ease" }}
-          >
-            {centerId && (
-              <DetailCard
-                centerId={centerId} // from your scroll tracker
-                rows={built.rows} // from buildTimeline(...)
-                nodes={nodes} // your authoring data
-                detailsMap={details} // your TLDetails
-              />
-            )}
-          </aside>
+          {/* right: Details (column on wide, overlay on narrow) */}
+          {!isNarrow ? (
+            <aside
+              className="px-6 md:px-12 sticky top-10"
+              style={{
+                opacity: rtOpacity,
+                transition: "opacity 0.3s ease",
+                width: DETAIL_W,
+                marginLeft: `calc(-1 * (50vw - 60px) * ${1 - hProgress})`,
+              }}
+            >
+              {centerId && (
+                <DetailCard
+                  centerId={centerId} // from your scroll tracker
+                  rows={built.rows} // from buildTimeline(...)
+                  nodes={nodes} // your authoring data
+                  detailsMap={details} // your TLDetails
+                />
+              )}
+            </aside>
+          ) : null}
         </div>
+
+        {/* overlay version for narrow screens */}
+        {showOverlay && (
+          <Portal>
+            <div
+              className="fixed z-40"
+              style={{
+                /* responsive right / left gutters: min, prefers, max */
+                ["--ov-right" as any]: "clamp(40px, 80px, 120px)", // maximum space from the right edge
+                ["--ov-left" as any]: "clamp(12px, 4vw, 24px)", // minimum space from the left edge
+
+                /* 2) position */
+                top: `calc(80px + env(safe-area-inset-top))`,
+                right: `calc(var(--ov-right) + env(safe-area-inset-right))`,
+
+                /* 3) width fits the viewport minus the right gutter + a small left margin */
+                width: `min(560px, calc(100vw - var(--ov-right) - var(--ov-left) - env(safe-area-inset-right) - env(safe-area-inset-left)))`,
+
+                maxHeight: "70vh",
+                overflow: "auto",
+                padding: "16px 20px",
+                borderRadius: 12,
+                backdropFilter: "blur(8px)",
+                background: "rgba(24,24,24,0.72)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                opacity: showOverlay ? rtOpacity : 0,
+                transition: "opacity 0.3s ease, transform 0.3s ease",
+                transform: `translateX(${(1 - rtOpacity) * 24}px)`,
+              }}
+            >
+              <DetailCard
+                centerId={centerId}
+                rows={built.rows}
+                nodes={nodes}
+                detailsMap={details}
+              />
+            </div>
+          </Portal>
+        )}
 
         {/* footer spacer under timeline */}
         <div

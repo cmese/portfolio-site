@@ -156,6 +156,7 @@ export default function Timeline({
       className="relative"
       style={{
         display: "grid",
+        width: "max-content",
         gridTemplateColumns: `repeat(${branchOrder.length}, ${COL_W}px)`,
         gridTemplateRows: `repeat(${rows.length}, ${ROW_H}px)`,
         transform: `translateY(${containerTransform}px)`,

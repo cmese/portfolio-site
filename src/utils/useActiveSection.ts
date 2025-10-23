@@ -8,7 +8,19 @@
 ----------------------------------------------------------------- */
 import { useEffect, useState } from "react";
 
-export default function useActiveSection(targetIds: string[]) {
+type Options = {
+  rootMargin?: string;
+  threshold?: number | number[];
+};
+
+export default function useActiveSection(
+  targetIds: string[],
+  {
+    // defaults tuned for sticky/overlay UIs
+    rootMargin = "-12% 0px -12% 0px",
+    threshold = [0, 0.25, 0.5, 0.75, 1],
+  }: Options = {}
+) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,13 +32,18 @@ export default function useActiveSection(targetIds: string[]) {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveId(entry.target.id);
-          }
-        });
+        // pick the *most visible* intersecting section
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (!visible.length) {
+          setActiveId(null); // ← clear when it leaves view
+          return;
+        }
+
+        visible.sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        const top = visible[0];
+        setActiveId((prev) => (prev === top.target.id ? prev : top.target.id));
       },
-      { rootMargin: "0px 0px -50% 0px", threshold: 0.5 } // 50 % visible
+      { root: null, rootMargin, threshold }
     );
 
     sections.forEach((el) => observer.observe(el));
