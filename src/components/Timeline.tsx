@@ -7,7 +7,7 @@ import { branchOrder, branchColor } from "@/data/branchPalette";
 
 import { COL_W, ROW_H, LINE_W, NODE_R, nodeY, colX } from "./timeline/geometry";
 import { idleColor, brightColor } from "./timeline/colors";
-import { useScrollTracker } from "./timeline/useScrollTracker";
+import { useScrollTracker } from "../hooks/useScrollTracker";
 
 interface TimelineProps {
   rows: TimelineRow[];

@@ -1,10 +1,11 @@
 // src/sections/Experience.tsx
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import Timeline from "@/components/Timeline";
 import { useBuiltTimeline } from "@/hooks/useBuiltTimeline";
-import { useScrollTracker } from "@/components/timeline/useScrollTracker";
+import { useScrollTracker } from "@/hooks/useScrollTracker";
+import { useTimelineProgress } from "@/contexts/TimelineProgress";
 
 // details for each node (super-simple placeholder)
 import { nodes, details } from "@/data/meTimeline"; // ⬅️ add this
@@ -23,6 +24,9 @@ export default function Experience() {
   const lastNodeRef = useRef<HTMLDivElement | null>(null);
 
   const activeId = useActiveSection(["experience"]);
+  const { setProgress, progress } = useTimelineProgress();
+
+  const TIMELINE_OFFSET_Y = 80; // matches transform in timeline-wrapper
 
   const {
     centerId,
@@ -34,12 +38,33 @@ export default function Experience() {
     spotlightY,
     scrollPhase,
     containerTransform,
-  } = useScrollTracker(containerRef, firstNodeRef, lastNodeRef);
+  } = useScrollTracker(
+    containerRef,
+    firstNodeRef,
+    lastNodeRef,
+    TIMELINE_OFFSET_Y
+  );
+
+  // sync local hProgress → global context
+  useEffect(() => {
+    setProgress(hProgress);
+  }, [hProgress, setProgress]);
 
   const built = useBuiltTimeline(); // { rows, segments, idxById }
 
   // responsive: overlay details on narrow screens
   const isNarrow = useMedia("(max-width: 900px)");
+
+  // fade window for overlay (tweak these)
+  const OVERLAY_START = 0.55; // start showing around 55% of slide-in
+  const OVERLAY_END = 0.75; // fully visible by 75%
+
+  const clamped = Math.max(
+    0,
+    Math.min(1, (progress - OVERLAY_START) / (OVERLAY_END - OVERLAY_START))
+  );
+  const overlayOpacity = clamped; // 0→1 between start/end
+  const showOverlay = isNarrow && !!centerId && overlayOpacity > 0;
 
   // visual knobs
   const DETAIL_W = "clamp(320px, 38vw, 560px)"; // min, fluid, max
@@ -57,11 +82,11 @@ export default function Experience() {
   const TL_W = branchOrder.length * COL_W;
   // when hProgress = 0, timeline should be roughly centered in the viewport
   // when hProgress = 1, no horizontal shift (flush-left).
-  const centerOffset = `calc(50vw + 20px - ${TL_W / 4}px)`;
+  const centerOffset = `calc(50vw + 53px - ${TL_W / 4}px)`;
   const tlShift = `calc(${centerOffset} * ${1 - hProgress})`;
 
   // overlay shows only when: mobile layout + we have a node + the Experience section is active
-  const showOverlay = isNarrow && !!centerId && activeId === "experience";
+  // const showOverlay = isNarrow && !!centerId && activeId === "experience";
   console.log("Experience: showOverlay =", showOverlay);
 
   return (
@@ -70,7 +95,7 @@ export default function Experience() {
         id="timeline-wrapper"
         className="will-change-transform"
         style={{
-          transform: "translateY(48px)" /* 48 px gap at top */,
+          transform: `translateY(${TIMELINE_OFFSET_Y}px)` /* px gap between timeline and hero */,
         }}
       >
         <div
@@ -153,9 +178,10 @@ export default function Experience() {
                 backdropFilter: "blur(8px)",
                 background: "rgba(24,24,24,0.72)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                opacity: showOverlay ? rtOpacity : 0,
+                opacity: overlayOpacity,
+                // opacity: showOverlay ? rtOpacity : 0,
                 transition: "opacity 0.3s ease, transform 0.3s ease",
-                transform: `translateX(${(1 - rtOpacity) * 24}px)`,
+                transform: `translateX(${(1 - overlayOpacity) * 24}px)`,
               }}
             >
               <DetailCard

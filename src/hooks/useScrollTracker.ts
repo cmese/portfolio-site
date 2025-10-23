@@ -12,7 +12,8 @@ const log = (...args: any[]) => DEBUG && console.log("[Timeline]", ...args);
 export function useScrollTracker(
   containerRef: React.RefObject<HTMLDivElement | null>,
   firstNodeRef: React.RefObject<HTMLDivElement | null>,
-  lastNodeRef: React.RefObject<HTMLDivElement | null>
+  lastNodeRef: React.RefObject<HTMLDivElement | null>,
+  visualOffsetY: number = 80
 ) {
   // Will hold {id, branch, rowIndex, x, y} for each node
   const nodePositions = useRef<
@@ -46,16 +47,15 @@ export function useScrollTracker(
       return;
 
     const fRect = firstNodeRef.current.getBoundingClientRect();
-    const visualOffset = 48; // adjust with transform in timeline-wrapper (see Experience.tsx)
     const fCenterY =
-      window.scrollY + fRect.top + fRect.height / 2 - visualOffset;
+      window.scrollY + fRect.top + fRect.height / 2 - visualOffsetY;
     const desired20 = window.innerHeight * 0.2;
     setScrollAtFirst20(fCenterY - desired20);
     log("scrollAtFirst20 =", fCenterY - desired20);
 
     const lRect = lastNodeRef.current.getBoundingClientRect();
     const lCenterY =
-      window.scrollY + lRect.top + lRect.height / 2 - visualOffset;
+      window.scrollY + lRect.top + lRect.height / 2 - visualOffsetY;
     const desired50 = window.innerHeight * 0.5;
     const desired80 = window.innerHeight * 0.8;
 
