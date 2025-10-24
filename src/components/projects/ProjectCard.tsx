@@ -83,7 +83,11 @@ export default function ProjectCard({ project, onOpen }: Props) {
           {tags.map((t) => (
             <span
               key={t}
-              className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-white/10 border border-gray-200/60 dark:border-white/10"
+              className="text-[11px] px-2 py-0.5 rounded-full border border-white/10
+             bg-white/10 dark:bg-white/10 text-white
+             shadow-[0_0_0_1px_rgba(255,255,255,0.06)]
+             [box-shadow:_0_0_18px_rgba(59,130,246,0.22)]
+"
             >
               {t}
             </span>
