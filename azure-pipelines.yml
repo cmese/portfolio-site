@@ -19,7 +19,6 @@ stages:
           - script: |
               npm ci
               npm run build
-              npm run export
             displayName: Build static site
 
           - task: AzureCLI@2
