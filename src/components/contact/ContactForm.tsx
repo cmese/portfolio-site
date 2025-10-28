@@ -26,11 +26,12 @@ export default function ContactForm() {
 
     setStatus("sending");
     try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        body: data,
-      });
-      if (!res.ok) throw new Error(await res.text());
+      // Disabled for now for static azure deployment
+      // const res = await fetch("/api/contact", {
+      //   method: "POST",
+      //   body: data,
+      // });
+      // if (!res.ok) throw new Error(await res.text());
       setStatus("ok");
       form.reset();
       startedAt.current = Date.now();

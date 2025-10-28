@@ -1,0 +1,37 @@
+trigger:
+  - main
+
+pool:
+  name: local-pool
+
+stages:
+  - stage: BuildAndDeploy
+    displayName: Build and Deploy Static Site
+    jobs:
+      - job: build_and_push
+        displayName: Build Next.js and push to Azure Static Website
+        steps:
+          - task: NodeTool@0
+            displayName: Use Node 18
+            inputs:
+              versionSpec: '18.x'
+
+          - script: |
+              npm ci
+              npm run build
+              npm run export
+            displayName: Build static site
+
+          - task: AzureCLI@2
+            displayName: Upload static site to $web
+            inputs:
+              azureSubscription: "azure-portfolio-connection"
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az storage blob upload-batch \
+                  --account-name $(STORAGE_ACCOUNT_NAME) \
+                  --source ./out \
+                  --destination '$web' \
+                  --overwrite
+
